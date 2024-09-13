@@ -1,5 +1,6 @@
 import { useState } from "react";
 import server from "./server";
+import { getPublicKey, signMessage } from "./ethereum/sign";
 
 function Transfer({ address, setBalance }) {
   const [sendAmount, setSendAmount] = useState("");
@@ -11,15 +12,25 @@ function Transfer({ address, setBalance }) {
     evt.preventDefault();
 
     try {
+      const msg = {
+        sender: address, recipient, amount: parseInt(sendAmount)
+      }
+      const tx = JSON.stringify(msg)
+      console.log(`VITE_${address}`, import.meta.env[`VITE_${address}`])
+      const [signature, recoveryBit] = await signMessage(tx, import.meta.env[`VITE_${address}`])
+      console.log(signature)
       const {
         data: { balance },
       } = await server.post(`send`, {
-        sender: address,
-        amount: parseInt(sendAmount),
-        recipient,
+        tx,
+        signature,
+        recoveryBit,
+        publicKey: getPublicKey(import.meta.env[`VITE_${address}`])
       });
       setBalance(balance);
+      alert("Transfer success")
     } catch (ex) {
+      console.log(ex)
       alert(ex.response.data.message);
     }
   }

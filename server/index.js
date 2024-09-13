@@ -1,35 +1,44 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const { generateAccounts, ACCOUNTS } = require("./ethereum/generate");
+const { recoverKey } = require("./ethereum/recoverKey");
 const port = 3042;
+
+generateAccounts(5)
+
+console.log("ACCOUNTS: ", ACCOUNTS)
 
 app.use(cors());
 app.use(express.json());
 
-const balances = {
-  "0x1": 100,
-  "0x2": 50,
-  "0x3": 75,
-};
 
 app.get("/balance/:address", (req, res) => {
   const { address } = req.params;
-  const balance = balances[address] || 0;
+  const balance = ACCOUNTS[address] || 0;
   res.send({ balance });
 });
 
 app.post("/send", (req, res) => {
-  const { sender, recipient, amount } = req.body;
+  const { tx, signature, recoveryBit, publicKey } = req.body;
 
+  // recover key
+  
+  const recoveredKey = recoverKey(tx, signature, recoveryBit)
+ 
+  if (recoveredKey !== publicKey) {
+    res.status(401).send({ message: 'You are not authorized'})
+    return;
+  }
+  const { sender, amount, recipient } = JSON.parse(tx)
   setInitialBalance(sender);
   setInitialBalance(recipient);
-
-  if (balances[sender] < amount) {
+  if (ACCOUNTS[sender] < amount) {
     res.status(400).send({ message: "Not enough funds!" });
   } else {
-    balances[sender] -= amount;
-    balances[recipient] += amount;
-    res.send({ balance: balances[sender] });
+    ACCOUNTS[sender] -= amount;
+    ACCOUNTS[recipient] += amount;
+    res.send({ balance: ACCOUNTS[sender] });
   }
 });
 
@@ -38,7 +47,7 @@ app.listen(port, () => {
 });
 
 function setInitialBalance(address) {
-  if (!balances[address]) {
-    balances[address] = 0;
+  if (!ACCOUNTS[address]) {
+    ACCOUNTS[address] = 0;
   }
 }
